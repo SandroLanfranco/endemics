@@ -1,0 +1,117 @@
+---
+title: "Exploratory analysis of endemism data"
+author: "SL LC KD"
+format: html
+editor: visual
+---
+
+```{r setting.up,echo=FALSE,message=FALSE,warning=FALSE}
+##Setting up----
+rm(list=ls(all=TRUE))
+
+### Packages ----
+packages <- c("tidyverse","knitr","GGally","DHARMa", "betareg")
+
+### Install packages not yet installed----
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+### Packages loading----
+invisible(lapply(packages, library, character.only = TRUE))
+```
+
+```{r import.data,echo=FALSE,message=FALSE,warning=FALSE}
+endemism <- read.csv("C:/Users/sandr/OneDrive/SL Folders research etc/SL_LC/Endemism on islands (Katya)/endemism.csv")
+```
+
+```{r plot, echo=FALSE,message=FALSE,warning=FALSE}
+endemism_plots <- endemism |> select(2,3,4,5,7,8,9)
+
+ggpairs(endemism_plots)
+```
+
+```{r more.plots}
+endemism |> ggplot(aes(x=topography, y=spp))+
+  geom_point()
+
+endemism |> ggplot(aes(x=topography, y=endemic_taxa))+
+  geom_point()
+
+endemism |> ggplot(aes(y=prop_endemic, x=topography))+
+  geom_point()
+
+endemism |> ggplot(aes(y=endemic_taxa, x=spp))+
+  geom_point()
+
+endemism |> ggplot(aes(y=endemic_taxa, x=area))+
+  geom_point()
+
+endemism |> ggplot(aes(y=prop_endemic, x=area))+
+  geom_point()
+
+endemism |> ggplot(aes(y=spp, x=area))+
+  geom_point()
+
+endemism |> ggplot(aes(y=endemic_taxa, x=proximity))+
+  geom_point()
+
+endemism |> ggplot(aes(y=prop_endemic, x=proximity))+
+  geom_point()
+
+
+ggplot(data=endemism,aes(x=area,y=topography,size=spp))+geom_point()
+
+ggplot(data=endemism,aes(x=area,y=topography,size=prop_endemic))+geom_point()
+
+ggplot(data=endemism,aes(x=area,y=topography,size=endemic_taxa))+geom_point()
+```
+
+```{r log}
+endemism <- endemism |> mutate(logS = log(spp),logA = log(area))
+
+endemism |> ggplot(aes(x=logA,y=logS))+geom_point()
+
+# en <- endemism |> lm(logA,logS)
+
+endemism2  <-  endemism |> select(1,2,4,8:11)
+
+endemism2 |> ggpairs()
+```
+
+```{r models}
+mod1 <- lm(spp ~area+topography+proximity+population,data=endemism)
+
+summary(mod1)
+
+mod2 <- lm(spp~area+topography+proximity,data=endemism)
+
+summary(mod2)
+
+mod3 <- glm(spp~area+topography+proximity,data=endemism)
+
+mod4 <- glm(endemic_taxa~area+topography+proximity,data=endemism)
+
+summary(mod4)
+
+mod5 <- betareg(prop_endemic~area+topography+proximity,data=endemism)
+
+summary(mod5)
+
+```
+
+```{r best.subsets}
+endemism3 <- endemism |> select(spp,topography,area,proximity,population)
+
+#Load the required packages
+library(leaps)
+# Load the data
+data(endemism3)
+# Compute best subsets regression
+models <- regsubsets(spp ~ ., data = endemism3, nvmax = 4)
+# Print the summary of the models
+summary(models)
+
+plot(models, scale = "adjr2")
+```

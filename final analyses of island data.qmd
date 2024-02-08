@@ -1,0 +1,714 @@
+---
+title: "Final data analysis"
+author: "SL, LC, KD"
+format: html
+title-block-banner: true
+language:
+  en:
+    title-block-modified: "Updated"
+date: "18 December 2023"
+date-modified: today
+code-fold: true
+editor: visual
+engine: knitr---
+---
+
+# Introduction
+
+This is an outline of the analyses that will be carried out on the island endemics dataset. The revised analysis is based on the advice of Dr Fiona Sammut.
+
+## Dr Sammut's advice
+
+"*Once you have more data, if the aim is prediction, when using total taxa or endemic taxa as the response variable you might wish to start off by using a linear regression model.  If the assumptions of the model are violated, you might wish to look into Poisson regression (generalised linear model with log link) as an alternative and if the latter does not work, use the negative binomial generalised linear model.*
+
+*For percentage endemism as response variable, you can look into using the beta regression model or modelling using compositional data analysis.*"
+
+# Method
+
+\(1\) Creation of dummy dataset with known properties for testing. This was created using the ChatGPT Data Analysis module.
+
+\(2\) Running the analysis on the dummy dataset and interpreting the results.
+
+\(3\) Running the analysis on the real dataset and interpreting the results.
+
+## Constraints to look out for
+
+Our dependent variable need to be treated carefully:
+
+\(1\) Number of species - this is 'count' data (no fractions). The usual linear regression is not suited to count data. We could use a GLM (if the assumptions are met) or else a Poisson regression with a log-link function.
+
+\(2\) Proportion of endemic species: This takes values between 0 and 1 and is therefore 'compositional' data. The usual linear regression cannot be used for this type of data. We'll be using Beta regression for this.
+
+```{r setting.up,echo=FALSE,message=FALSE,warning=FALSE}
+##Setting up----
+rm(list=ls(all=TRUE))
+
+### Packages ----
+packages <- c("tidyverse","knitr","GGally","DHARMa","betareg","AICcmodavg", "MASS")
+
+### Install packages not yet installed----
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+### Packages loading----
+invisible(lapply(packages, library, character.only = TRUE))
+```
+
+```{r import.data,echo=FALSE,message=FALSE,warning=FALSE}
+island_data <- read.csv("C:/Users/sandr/OneDrive/SL Folders research etc/SL_LC/Endemism on islands (Katya)/Data/island_data.csv")
+```
+
+## Creation of dummy dataset for testing
+
+The dummy dataset was created using the Data Analysis module of ChatGPT 4, using the prompts below:
+
+1.  **Island Name:** Generate a categorical variable for island names ("Island_1" to "Island_10").
+
+2.  **Numerical Variables (proximity, area, topography, population):**
+
+    -   **Proximity:** Smaller values should correlate with a higher number of species.
+
+    -   **Area:** Larger values should correlate with a higher number of species.
+
+    -   **Topography:** Larger values should correlate with both a higher number of species and a higher 'proportion' value.
+
+    -   **Population:** This will be random noise, uncorrelated with other variables.
+
+3.  **Dependent Variables:**
+
+    -   **Number of Species:** An integer, correlated as described above.
+
+    -   **Proportion:** A value between 0 and 1, significantly correlated only with topography.
+
+4.  **Correlation Patterns:** Ensure the specified correlation patterns are reflected in the data.
+
+5.  **Export to CSV:** Save the dataset in a .csv file.
+
+Let's start by generating the dataset.
+
+The dataset has been created according to your specifications and saved in CSV format. You can download it using the link below:
+
+Download the Island Data CSV file ​
+
+## Choice of models
+
+We need to create two basic models, one with the 'number of species' (a count variable) as the dependent variable and the other with the 'proportion of endemic taxa' (compositional data) as the dependent variable.
+
+Given that 'number of species' is a count, we will use a GLM and a Poisson regression. For the 'proportion of endemics' model, we will use beta regression.
+
+## Analysis using dummy data
+
+### Number of species
+
+Two models will be used: one of them relating the number of species on an island to "area", "topographic complexity" and "proximity" and the other adding another variable, "population density".
+
+#### GLM for number of species - 4 dependent variables
+
+```{r glm.dummy.4dv}
+
+# GLM using four independent variables
+
+mod1 <- glm(spp ~
+              area+
+              topography+
+              proximity+
+              population,
+            data=island_data)
+
+summary(mod1)
+
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod1)
+#plot(simulationOutput)
+
+
+```
+
+#### GLM for number of species - 3 dependent variables
+
+```{r glm.dummy.3dv}
+
+# GLM using three independent variables
+
+mod2 <- glm(spp ~ 
+              area+
+              topography+
+              proximity,
+            data=island_data)
+
+summary(mod2)
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod2)
+#plot(simulationOutput)
+```
+
+#### Poisson regression for number of species - 4 dependent variables
+
+```{r poisson.dummy.4dv}
+
+# Poisson regression using four independent variables
+
+mod3 <- glm(spp ~
+              area+
+              topography+
+              proximity+
+              population,
+            data=island_data,
+            family = poisson(link = "log"))
+
+summary(mod3)
+
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod3)
+#plot(simulationOutput)
+
+
+```
+
+#### Poisson regression for number of species - 3 dependent variables
+
+```{r poisson.dummy.3dv}
+
+# Poisson regression using three independent variables
+
+mod4 <- glm(spp ~ 
+              area+
+              topography+
+              proximity,
+            data=island_data,
+            family = poisson(link = "log"))
+
+summary(mod4)
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod4)
+#plot(simulationOutput)
+
+```
+
+### Proportion of endemic species
+
+Two models will be used: one of them relating the proportion of endemic species on an island to "area", "topographic complexity" and "proximity" and the other adding another variable, "population density".
+
+#### Proportion of endemic species - 3 dependent variables
+
+```{r beta.regression.dummy.3dv}
+
+mod5 <- betareg::betareg(prop_endemic ~ 
+                           area+
+                           topography+
+                           proximity,
+                         data=island_data)
+
+summary(mod5)
+
+
+```
+
+#### Proportion of endemic species - 4 dependent variables
+
+```{r beta.regression.dummy.4dv}
+
+
+mod6 <- betareg::betareg(prop_endemic ~ 
+                           area+
+                           topography+
+                           proximity+
+                           population,
+                         data=island_data)
+
+summary(mod6)
+
+```
+
+### Finding the best model
+
+```{r AIC.dummy}
+# Find the best fitting model
+model.set <- list(mod3, mod4)
+model.names <- c("glm_all", "glm_area+topo+prox")
+
+aictab(model.set, modnames = model.names)
+```
+
+## Analysis using 'real' data
+
+The 'real' data will now be imported for analysis.
+
+### Importing data
+
+```{r import.realdata,echo=FALSE,message=FALSE,warning=FALSE}
+
+island_data <- read.csv("C:/Users/sandr/OneDrive/SL Folders research etc/SL_LC/Endemism on islands (Katya)/data/endemism.csv")
+
+
+
+```
+
+### Number of species
+
+Two models will be used: one of them relating the number of species on an island to "area", "topographic complexity" and "proximity" and the other adding another variable, "population density".
+
+#### GLM for number of species - 4 dependent variables
+
+```{r glm.real.4dv}
+
+# GLM using four independent variables
+
+mod1 <- glm(spp ~
+              area+
+              topography+
+              proximity+
+              population,
+            data=island_data)
+
+summary(mod1)
+
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod1)
+#plot(simulationOutput)
+```
+
+#### GLM for number of species - 3 dependent variables
+
+```{r glm.real.3dv}
+
+# GLM using three independent variables
+
+mod2 <- glm(spp ~ 
+              area+
+              topography+
+              proximity,
+            data=island_data)
+
+summary(mod2)
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod2)
+#plot(simulationOutput)
+```
+
+#### Poisson regression for number of species - 4 dependent variables
+
+```{r poisson.real.4dv}
+
+# Poisson regression using four independent variables
+
+
+mod3 <- glm(spp ~
+              area+
+              topography+
+              proximity+
+              population,
+            data=island_data,
+            family = poisson(link = "log"))
+
+summary(mod3)
+
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod3)
+#plot(simulationOutput)
+
+# negative binomial
+mod3nb <- glm.nb(spp ~
+              area+
+              topography+
+              proximity+
+              population,
+            data=island_data)
+
+summary(mod3nb)
+
+```
+
+#### Poisson regression for number of species - 3 dependent variables
+
+```{r poisson.real.3dv}
+
+# Poisson regression using three independent variables
+
+mod4 <- glm(spp ~ 
+              area+
+              topography+
+              proximity,
+            data=island_data,
+            family = poisson(link = "log"))
+
+summary(mod4)
+
+# test assumptions
+#simulationOutput <- simulateResiduals(fittedModel = mod4)
+#plot(simulationOutput)
+
+# negative binomial
+
+mod4nb <- glm.nb(spp ~ 
+              area+
+              topography+
+              proximity,
+            data=island_data,
+            )
+
+summary(mod4nb)
+```
+
+### Proportion of endemic species
+
+Two models will be used: one of them relating the proportion of endemic species on an island to "area", "topographic complexity" and "proximity" and the other adding another variable, "population density".
+
+#### Proportion of endemic species - 3 dependent variables
+
+```{r beta.regression.real.3dv}
+
+mod5 <- betareg::betareg(prop_endemic ~ 
+                           area+
+                           topography+
+                           proximity,
+                         data=island_data)
+
+summary(mod5)
+
+```
+
+#### Proportion of endemic species - 4 dependent variables
+
+```{r beta.regression.real.4dv}
+
+mod6 <- betareg::betareg(prop_endemic ~ 
+                           area+
+                           topography+
+                           proximity+
+                           population,
+                         data=island_data)
+
+summary(mod6)
+```
+
+```{r beta.regression.real.2dv}
+
+mod6a <- betareg::betareg(prop_endemic ~ 
+                           area+
+                           topography,
+                         data=island_data)
+
+summary(mod6a)
+AICc(mod6a)
+
+mod6b <- betareg::betareg(prop_endemic ~ 
+                                                     topography,
+                         data=island_data)
+
+summary(mod6b)
+AICc(mod6b)
+
+mod6c <- betareg::betareg(prop_endemic ~ 
+                           proximity+
+                           topography,
+                         data=island_data)
+
+
+summary(mod6c)
+AICc(mod6c)
+```
+
+### Finding the best model
+
+```{r AIC.real}
+# Find the best fitting model
+model.set <- list(mod3, mod4)
+model.names <- c("glm_all", "glm_area+topo+prox")
+
+aictab(model.set, modnames = model.names)
+```
+
+# Summary of results
+
+## Number of species
+
+### Including "Population density"
+
+#### GLM for number of species - 4 dependent variables
+
+topography P = 0.0278\*
+
+Null deviance: 3752264 on 7 degrees of freedom
+
+Residual deviance: 153099 on 3 degrees of freedom
+
+#### Poisson regression for number of species - 4 dependent variables
+
+area P \< 0.0001\*\*\*
+
+topography P \< 0.0001\*\*\*
+
+population P = 0.001\*\*\*
+
+Null deviance: 1834.114 on 7 degrees of freedom
+
+Residual deviance: 52.774 on 3 degrees of freedom
+
+### Excluding "Population density"
+
+#### GLM for number of species - 3 dependent variables
+
+area P = 0.05\*
+
+topography P = 0.009\*\*\*
+
+Null deviance: 3752264 on 7 degrees of freedom
+
+Residual deviance: 159209 on 4 degrees of freedom
+
+#### Poisson regression for number of species - 3 dependent variables
+
+area P \< 0.0001\*\*\*
+
+topography P \< 0.0001\*\*\*
+
+Null deviance: 1834.114 on 7 degrees of freedom
+
+Residual deviance: 63.162 on 4 degrees of freedom
+
+## Proportion of endemic species
+
+### Including "Population density"
+
+#### Proportion of endemic species - 4 dependent variables
+
+area P \< 0.0001\*\*\*
+
+topography P = 0.002\*\*
+
+proximity P \< 0.0001\*\*\*
+
+population P = 0.003\*\*
+
+### Excluding "Population density"
+
+#### Proportion of endemic species - 3 dependent variables
+
+topography P \< 0.0001\*\*\*
+
+proximity P = 0.015\*
+
+# Removal of outliers (using only large islands)
+
+The analysis will now be carried out again using only the five large islands and excluding the archipelagos.
+
+```{r import.realdata.filtered,echo=FALSE,message=FALSE,warning=FALSE}
+
+island_data <- read.csv("C:/Users/sandr/OneDrive/SL Folders research etc/SL_LC/Endemism on islands (Katya)/data/endemism.csv")
+
+island_data <- island_data |> filter(island != "malta",island != "tuscan_archipelago",island != "balearics")
+#island_data <- island_data |> filter(Island != "tuscan_archipelago")
+#island_data <- island_data |> filter(Island != "balearics")
+
+```
+
+### Number of species
+
+Two models will be used: one of them relating the number of species on an island to "area", "topographic complexity" and "proximity" and the other adding another variable, "population density".
+
+#### GLM for number of species - 4 dependent variables
+
+```{r glm.real.4dv.fiveguys}
+
+# GLM using four independent variables
+
+mod1 <- glm(spp ~
+              area+
+              topography+
+              proximity+
+              population,
+            data=island_data)
+
+summary(mod1)
+
+```
+
+#### GLM for number of species - 3 dependent variables
+
+```{r glm.real.3dv.fiveguys}
+
+# GLM using three independent variables
+
+mod2 <- glm(spp ~ 
+              area+
+              topography+
+              proximity,
+            data=island_data)
+
+summary(mod2)
+
+```
+
+#### Poisson regression for number of species - 4 dependent variables
+
+```{r poisson.real.4dv.fiveguys}
+
+# Poisson regression using four independent variables
+
+
+mod3 <- glm(spp ~
+              area+
+              topography+
+              proximity+
+              population,
+            data=island_data,
+            family = poisson(link = "log"))
+
+summary(mod3)
+
+
+```
+
+#### Poisson regression for number of species - 3 dependent variables
+
+```{r poisson.real.3dv.fiveguys}
+
+# Poisson regression using three independent variables
+
+mod4 <- glm(spp ~ 
+              area+
+              topography+
+              proximity,
+            data=island_data,
+            family = poisson(link = "log"))
+
+summary(mod4)
+
+```
+
+### Proportion of endemic species
+
+Two models will be used: one of them relating the proportion of endemic species on an island to "area", "topographic complexity" and "proximity" and the other adding another variable, "population density".
+
+#### Proportion of endemic species - 3 dependent variables
+
+```{r beta.regression.real.3dv.five guys}
+
+mod5 <- betareg::betareg(prop_endemic ~ 
+                           area+
+                           topography+
+                           proximity,
+                         data=island_data)
+
+summary(mod5)
+```
+
+#### Proportion of endemic species - 4 dependent variables
+
+```{r beta.regression.real.4dv.five guys}
+
+#mod6 <- betareg::betareg(prop_endemic ~ 
+                          # area+
+                          # topography+
+                          # proximity+
+                          # population,
+                        # data=island_data)
+
+#summary(mod6)
+
+```
+
+## New results
+
+## Number of species
+
+### Including "Population density"
+
+#### GLM for number of species - 4 dependent variables
+
+Not worked out; errors noted.
+
+#### Poisson regression for number of species - 4 dependent variables
+
+area P \< 0.0001\*\*\*
+
+topography P \< 0.0001\*\*\*
+
+population P \< 0.001\*\*\*
+
+Null deviance: 5.7856e+02 on 4 degrees of freedom
+
+Residual deviance: -6.7946e-14 on 0 degrees of freedom
+
+### Excluding "Population density"
+
+#### GLM for number of species - 3 dependent variables
+
+Null deviance: 1393487 on 4 degrees of freedom
+
+Residual deviance: 40488 on 1 degrees of freedom
+
+#### Poisson regression for number of species - 3 dependent variables
+
+area P \< 0.0001\*\*\*
+
+topography P \< 0.0001\*\*\*
+
+Null deviance: 578.558 on 4 degrees of freedom
+
+Residual deviance: 43.292 on 1 degrees of freedom
+
+## Proportion of endemic species
+
+### Including "Population density"
+
+#### Proportion of endemic species - 4 dependent variables
+
+Not worked out - errors recorded
+
+### Excluding "Population density"
+
+#### Proportion of endemic species - 3 dependent variables
+
+area P \< 0.0001\*\*\*
+
+topography P \< 0.0001\*\*\*
+
+proximity P \< 0.0001\*\*\*
+
+# Conclusions
+
+| Model                   | Area   | Topography | Proximity | Population |
+|-------------------------|--------|------------|-----------|------------|
+| All islands 4dv GLM     |        | \*         | ns        | ns         |
+| All islands 4dv Poisson | \*\*\* | \*\*\*     | ns        | \*\*\*     |
+| All islands 4dv beta    | \*\*\* | \*\*       | \*\*\*    | \*\*       |
+| All islands 3dv GLM     | \*     | \*\*\*     | ns        | not tested |
+| All islands 3dv Poisson | \*\*\* | \*\*\*     | ns        | not tested |
+| All islands 3dv beta    | ns     | \*\*\*     | \*        | not tested |
+| 5 islands 4dv GLM       | NA     | NA         | NA        | NA         |
+| 5 islands 4dv Poisson   | \*\*\* | \*\*\*     | ns        | \*\*\*     |
+| 5 islands 4dv beta      | NA     | NA         | NA        | NA         |
+| 5 islands 3dv GLM       | ns     | ns         | ns        | not tested |
+| 5 islands 3dv Poisson   | \*\*\* | \*\*\*     | ns        | not tested |
+| 5 islands 3dv beta      | \*\*\* | \*\*\*     | \*\*\*    | not tested |
+|                         |        |            |           |            |
+
+: Comparison of models
+
+```{r best.subsets}
+endemism3 <- island_data |> select(spp,topography,area,proximity,population)
+
+#Load the required packages
+library(leaps)
+# Load the data
+#data(endemism3)
+# Compute best subsets regression
+models <- regsubsets(spp ~ ., data = endemism3, nvmax = 4)
+# Print the summary of the models
+summary(models)
+
+plot(models, scale = "adjr2")
+```
+
+?
